@@ -15,11 +15,11 @@
  *
  */
 
-class Bucket {}
+import { SelfThrottle } from './index';
 
-export class SelfThrottle {
-    buckets: Bucket;
-    constructor() {
-        this.buckets = [];
-    }
-}
+describe('Can initialise', () => {
+    it('is constructable', () => {
+        const instance = new SelfThrottle();
+        expect(instance).toBeInstanceOf(SelfThrottle);
+    });
+});

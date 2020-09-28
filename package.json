@@ -1,6 +1,6 @@
 {
-  "version": "0.1.0",
-  "license": "MIT",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "files": [
@@ -8,13 +8,15 @@
     "src"
   ],
   "engines": {
-    "node": ">=10"
+    "node": ">=12"
   },
   "scripts": {
     "start": "tsdx watch",
     "build": "tsdx build",
+    "prebuild": "npm run test",
     "test": "tsdx test",
-    "lint": "tsdx lint",
+    "pretest": "npm run lint",
+    "lint": "tsdx lint src",
     "prepare": "tsdx build",
     "size": "size-limit",
     "analyze": "size-limit --why"
@@ -22,14 +24,13 @@
   "peerDependencies": {},
   "husky": {
     "hooks": {
-      "pre-commit": "tsdx lint"
+      "pre-commit": "npm test"
     }
   },
   "prettier": {
-    "printWidth": 80,
     "semi": true,
     "singleQuote": true,
-    "trailingComma": "es5"
+    "trailingComma": "all"
   },
   "name": "self-throttle",
   "author": "Andrew Aylett",
@@ -51,5 +52,18 @@
     "tsdx": "^0.14.0",
     "tslib": "^2.0.1",
     "typescript": "^4.0.3"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version",
+      "node >= 12"
+    ]
   }
 }
