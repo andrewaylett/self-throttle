@@ -17,6 +17,7 @@
     "test": "tsdx test",
     "pretest": "npm run lint",
     "lint": "tsdx lint src",
+    "lint:fix": "npm run lint -- --fix",
     "prepare": "tsdx build",
     "size": "size-limit",
     "analyze": "size-limit --why"

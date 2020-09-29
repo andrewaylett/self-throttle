@@ -24,10 +24,29 @@ describe('Can initialise', () => {
     });
 });
 
-describe('Event submission', () => {
+const systemUnderTest = () => new SelfThrottle();
+
+describe('Basic event submission', () => {
     it('will count successes', () => {
-        const instance = new SelfThrottle();
+        const instance = systemUnderTest();
         instance.recordSuccess();
+        expect(instance).toHaveProperty('successes', 1);
+    });
+
+    it('will allow an attempt', async () => {
+        const instance = new SelfThrottle();
+        const result = await instance.registerAttempt();
+        expect(result).toBeTruthy();
+    });
+});
+
+describe('Promise Submission', () => {
+    it('will count a successful promise', async () => {
+        const instance = new SelfThrottle();
+        const promise = Promise.resolve(true);
+        const result = await instance.registerPromise(promise);
+        expect(await promise).toBeTruthy();
+        expect(result).toBeTruthy();
         expect(instance).toHaveProperty('successes', 1);
     });
 });

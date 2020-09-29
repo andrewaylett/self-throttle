@@ -32,4 +32,14 @@ export class SelfThrottle {
     get successes(): number {
         return this.buckets[0].count;
     }
+
+    async registerAttempt() {
+        return true;
+    }
+
+    async registerPromise<T>(promise: Promise<T>): Promise<T> {
+        const result = await promise;
+        this.recordSuccess();
+        return result;
+    }
 }
