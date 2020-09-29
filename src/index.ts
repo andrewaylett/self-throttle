@@ -15,11 +15,21 @@
  *
  */
 
-class Bucket {}
+class Bucket {
+    count: number = 0;
+}
 
 export class SelfThrottle {
-    buckets: Bucket;
+    buckets: Bucket[];
     constructor() {
-        this.buckets = [];
+        this.buckets = [new Bucket()];
+    }
+
+    recordSuccess() {
+        this.buckets[0].count += 1;
+    }
+
+    get successes(): number {
+        return this.buckets[0].count;
     }
 }

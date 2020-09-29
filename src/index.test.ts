@@ -23,3 +23,11 @@ describe('Can initialise', () => {
         expect(instance).toBeInstanceOf(SelfThrottle);
     });
 });
+
+describe('Event submission', () => {
+    it('will count successes', () => {
+        const instance = new SelfThrottle();
+        instance.recordSuccess();
+        expect(instance).toHaveProperty('successes', 1);
+    });
+});
