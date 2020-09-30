@@ -15,7 +15,27 @@
  *
  */
 
+import 'jest';
 import { SelfThrottle } from './index';
+import { millisecondTicker } from './time';
+
+jest.mock('./time');
+const mockMillisecondTicker = millisecondTicker as jest.Mock<
+    ReturnType<typeof millisecondTicker>
+>;
+
+type ms = 'ms';
+const ms = 'ms'; // eslint-disable-line no-redeclare
+type MilliSeconds = [number, ms];
+let nextMockTime: MilliSeconds = [0, ms];
+mockMillisecondTicker.mockImplementation(() => {
+    const result = nextMockTime[0];
+    nextMockTime[0] += 1;
+    return result;
+});
+const seconds = (s: number) => {
+    nextMockTime = [nextMockTime[0] + s * 1000, ms];
+};
 
 describe('Can initialise', () => {
     it('is constructable', () => {
@@ -34,7 +54,7 @@ describe('Basic event submission', () => {
     });
 
     it('will allow an attempt', async () => {
-        const instance = new SelfThrottle();
+        const instance = systemUnderTest();
         const result = await instance.registerAttempt();
         expect(result).toBeTruthy();
     });
@@ -42,11 +62,20 @@ describe('Basic event submission', () => {
 
 describe('Promise Submission', () => {
     it('will count a successful promise', async () => {
-        const instance = new SelfThrottle();
+        const instance = systemUnderTest();
         const promise = Promise.resolve(true);
         const result = await instance.registerPromise(promise);
         expect(await promise).toBeTruthy();
         expect(result).toBeTruthy();
         expect(instance).toHaveProperty('successes', 1);
+    });
+});
+
+describe('Time', () => {
+    it('forgets successes after a minute', async () => {
+        const instance = systemUnderTest();
+        instance.recordSuccess();
+        seconds(60);
+        expect(instance).toHaveProperty('successes', 0);
     });
 });
