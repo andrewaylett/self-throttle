@@ -91,8 +91,9 @@ export class SelfThrottle {
 
     async registerPromise<T>(promise: Promise<T>): Promise<T> {
         this.maybeTick();
+        const bucket = this.buckets[0];
         const result = await promise;
-        this.recordSuccess();
+        bucket.successes++;
         return result;
     }
 }

@@ -38,6 +38,22 @@ const seconds = (s: number) => {
     nextMockTime = [nextMockTime[0] + s * 1000, ms];
 };
 
+const buildPromise = <T>(): [
+    Promise<T>,
+    (v: T | PromiseLike<T> | undefined) => void,
+    (reason?: any) => void,
+] => {
+    let resolve: (v: T | PromiseLike<T> | undefined) => void;
+    let reject: (reason?: any) => void;
+    const promise = new Promise<T>((resolve1, reject1) => {
+        resolve = resolve1;
+        reject = reject1;
+    });
+    // @ts-ignore
+    // noinspection JSUnusedAssignment
+    return [promise, resolve, reject];
+};
+
 describe('Can initialise', () => {
     it('is constructable', () => {
         const instance = new SelfThrottle();
@@ -77,6 +93,19 @@ describe('Promise Submission', () => {
         expect(await promise).toBeTruthy();
         expect(result).toBeTruthy();
         expect(instance).toHaveProperty('successes', 1);
+    });
+
+    it('counts promises against the tick they started in', async () => {
+        const [promise, resolve] = buildPromise<boolean>();
+        const instance = systemUnderTest();
+        const returnedPromise = instance.registerPromise(promise);
+        expect(instance).toHaveProperty('successes', 0);
+        seconds(30);
+        resolve(true);
+        expect(await returnedPromise).toBeTruthy();
+        expect(instance).toHaveProperty('successes', 1);
+        seconds(30);
+        expect(instance).toHaveProperty('successes', 0);
     });
 });
 
