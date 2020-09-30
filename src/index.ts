@@ -44,7 +44,7 @@ export class SelfThrottle {
             return;
         }
         this.lastTick += diff - (diff % 1000);
-        this.buckets.push(new Bucket(this.lastTick));
+        this.buckets.unshift(new Bucket(this.lastTick));
         this.buckets = this.buckets.filter(
             bucket => this.lastTick < bucket.expiry,
         );

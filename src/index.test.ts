@@ -72,10 +72,19 @@ describe('Promise Submission', () => {
 });
 
 describe('Time', () => {
-    it('forgets successes after a minute', async () => {
+    it('forgets successes after a minute', () => {
         const instance = systemUnderTest();
         instance.recordSuccess();
         seconds(60);
         expect(instance).toHaveProperty('successes', 0);
+    });
+
+    it('remembers successes less than a minute old', () => {
+        const instance = systemUnderTest();
+        instance.recordSuccess();
+        seconds(30);
+        instance.recordSuccess();
+        seconds(30);
+        expect(instance).toHaveProperty('successes', 1);
     });
 });
