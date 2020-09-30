@@ -20,31 +20,51 @@ import { millisecondTicker } from './time';
 class Bucket {
     tick: number;
     expiry: number;
-    count: number = 0;
+    successes: number = 0;
+    attempts: number = 0;
+    limit: number;
 
-    constructor(tick: number) {
+    constructor(tick: number, limit: number) {
         this.tick = tick;
         this.expiry = tick + 60_000;
+        this.limit = limit;
+    }
+
+    try() {
+        if (this.attempts < this.limit) {
+            this.attempts++;
+            return true;
+        }
+        return false;
     }
 }
 
 export class SelfThrottle {
-    buckets: Bucket[];
-    lastTick: number = millisecondTicker();
+    private buckets: Bucket[];
+    private lastTick: number = 0;
 
     constructor() {
-        this.buckets = [new Bucket(this.lastTick)];
+        this.buckets = [];
+    }
+
+    private limitForNextTick() {
+        const computedLimit = Math.ceil(
+            (1.2 * this._successes()) / this.buckets.length,
+        );
+        return Math.max(1, isNaN(computedLimit) ? 1 : computedLimit);
     }
 
     maybeTick() {
         const now = millisecondTicker();
         const diff = now - this.lastTick;
-        if (diff < 1000) {
+        if (diff < 1000 && this.buckets.length > 0) {
             // No need to tick, we're still in the same second
             return;
         }
         this.lastTick += diff - (diff % 1000);
-        this.buckets.unshift(new Bucket(this.lastTick));
+        this.buckets.unshift(
+            new Bucket(this.lastTick, this.limitForNextTick()),
+        );
         this.buckets = this.buckets.filter(
             bucket => this.lastTick < bucket.expiry,
         );
@@ -52,17 +72,21 @@ export class SelfThrottle {
 
     recordSuccess() {
         this.maybeTick();
-        this.buckets[0].count += 1;
+        this.buckets[0].successes += 1;
+    }
+
+    private _successes() {
+        return this.buckets.reduce((prev, cur) => prev + cur.successes, 0);
     }
 
     get successes(): number {
         this.maybeTick();
-        return this.buckets.reduce((prev, cur) => prev + cur.count, 0);
+        return this._successes();
     }
 
-    async registerAttempt() {
+    registerAttempt() {
         this.maybeTick();
-        return true;
+        return this.buckets[0].try();
     }
 
     async registerPromise<T>(promise: Promise<T>): Promise<T> {

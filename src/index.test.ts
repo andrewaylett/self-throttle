@@ -18,6 +18,7 @@
 import 'jest';
 import { SelfThrottle } from './index';
 import { millisecondTicker } from './time';
+import assert from 'assert';
 
 jest.mock('./time');
 const mockMillisecondTicker = millisecondTicker as jest.Mock<
@@ -55,8 +56,16 @@ describe('Basic event submission', () => {
 
     it('will allow an attempt', async () => {
         const instance = systemUnderTest();
-        const result = await instance.registerAttempt();
+        const result = instance.registerAttempt();
         expect(result).toBeTruthy();
+    });
+
+    it('will only allow one request in the first second', async () => {
+        const instance = systemUnderTest();
+        const one = instance.registerAttempt();
+        const two = instance.registerAttempt();
+        expect(one).toBeTruthy();
+        expect(two).toBeFalsy();
     });
 });
 
@@ -86,5 +95,18 @@ describe('Time', () => {
         instance.recordSuccess();
         seconds(30);
         expect(instance).toHaveProperty('successes', 1);
+    });
+
+    it('a success in the first tick means two attempts in the second', async () => {
+        const instance = systemUnderTest();
+        assert(instance.registerAttempt());
+        instance.recordSuccess();
+        seconds(1);
+        const one = instance.registerAttempt();
+        const two = instance.registerAttempt();
+        const three = instance.registerAttempt();
+        expect(one).toBeTruthy();
+        expect(two).toBeTruthy();
+        expect(three).toBeFalsy();
     });
 });
