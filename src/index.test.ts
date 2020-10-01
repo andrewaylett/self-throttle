@@ -76,12 +76,12 @@ describe('Basic event submission', () => {
         expect(result).toBeTruthy();
     });
 
-    it('will only allow one request in the first second', async () => {
+    it('will allow more than one request in the first second', async () => {
         const instance = systemUnderTest();
         const one = instance.registerAttempt();
         const two = instance.registerAttempt();
         expect(one).toBeTruthy();
-        expect(two).toBeFalsy();
+        expect(two).toBeTruthy();
     });
 });
 
@@ -126,16 +126,16 @@ describe('Time', () => {
         expect(instance).toHaveProperty('successes', 1);
     });
 
-    it('a success in the first tick means two attempts in the second', async () => {
+    it('a failure in the first tick means only one attempt in the second', async () => {
         const instance = systemUnderTest();
         assert(instance.registerAttempt());
-        instance.recordSuccess();
+        instance.recordFailure();
         seconds(1);
         const one = instance.registerAttempt();
         const two = instance.registerAttempt();
         const three = instance.registerAttempt();
         expect(one).toBeTruthy();
-        expect(two).toBeTruthy();
+        expect(two).toBeFalsy();
         expect(three).toBeFalsy();
     });
 });
