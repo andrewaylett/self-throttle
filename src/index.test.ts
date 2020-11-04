@@ -16,9 +16,8 @@
  */
 
 import 'jest';
-import { SelfThrottle } from './index';
+import { SelfThrottle, SelfThrottleError } from './index';
 import { millisecondTicker } from './time';
-import assert from 'assert';
 
 jest.mock('./time');
 const mockMillisecondTicker = millisecondTicker as jest.Mock<
@@ -36,6 +35,9 @@ mockMillisecondTicker.mockImplementation(() => {
 });
 const seconds = (s: number) => {
     nextMockTime = [nextMockTime[0] + s * 1000, ms];
+};
+const setMockTime = (s: number) => {
+    nextMockTime = [s * 1000 + (nextMockTime[0] % 1000), ms];
 };
 
 const buildPromise = <T>(): [
@@ -64,32 +66,33 @@ describe('Can initialise', () => {
 const systemUnderTest = () => new SelfThrottle();
 
 describe('Basic event submission', () => {
-    it('will count successes', () => {
+    it('will count successes', async () => {
         const instance = systemUnderTest();
-        instance.recordSuccess();
+        await instance.try(async () => true);
         expect(instance).toHaveProperty('successes', 1);
     });
 
     it('will allow an attempt', async () => {
         const instance = systemUnderTest();
-        const result = instance.registerAttempt();
+        const result = await instance.try(async () => true);
         expect(result).toBeTruthy();
     });
 
     it('will allow more than one request in the first second', async () => {
         const instance = systemUnderTest();
-        const one = instance.registerAttempt();
-        const two = instance.registerAttempt();
+        const one = await instance.try(async () => true);
+        const two = await instance.try(async () => true);
         expect(one).toBeTruthy();
         expect(two).toBeTruthy();
     });
 });
 
 describe('Promise Submission', () => {
-    it('will count a successful promise', async () => {
+    it('will count a wrap returning a successful promise', async () => {
         const instance = systemUnderTest();
         const promise = Promise.resolve(true);
-        const result = await instance.registerPromise(promise);
+        const wrapped = instance.wrap(async b => b);
+        const result = await wrapped(promise);
         expect(await promise).toBeTruthy();
         expect(result).toBeTruthy();
         expect(instance).toHaveProperty('successes', 1);
@@ -98,7 +101,8 @@ describe('Promise Submission', () => {
     it('counts promises against the tick they started in', async () => {
         const [promise, resolve] = buildPromise<boolean>();
         const instance = systemUnderTest();
-        const returnedPromise = instance.registerPromise(promise);
+        const wrapped = instance.wrap(async b => b);
+        const returnedPromise = wrapped(promise);
         expect(instance).toHaveProperty('successes', 0);
         seconds(30);
         resolve(true);
@@ -109,33 +113,151 @@ describe('Promise Submission', () => {
     });
 });
 
+describe('Failures', () => {
+    it('records synchronous errors', () => {
+        const instance = systemUnderTest();
+        const error = new Error('expected');
+        const wrapped = instance.wrap(() => {
+            throw error;
+        });
+        expect(wrapped).toThrow(error);
+        expect(instance).toHaveProperty('successes', 0);
+        expect(instance).toHaveProperty('failures', 1);
+    });
+
+    it('records asynchronous errors', async () => {
+        const instance = systemUnderTest();
+        const error = new Error('expected');
+        const wrapped = instance.wrap(async () => {
+            throw error;
+        });
+        await expect(wrapped()).rejects.toThrow(error);
+        expect(instance).toHaveProperty('successes', 0);
+        expect(instance).toHaveProperty('failures', 1);
+    });
+});
+
 describe('Time', () => {
     it('forgets successes after a minute', () => {
         const instance = systemUnderTest();
-        instance.recordSuccess();
+        instance.try(() => Promise.resolve(true));
         seconds(60);
         expect(instance).toHaveProperty('successes', 0);
     });
 
-    it('remembers successes less than a minute old', () => {
+    it('remembers successes less than a minute old', async () => {
         const instance = systemUnderTest();
-        instance.recordSuccess();
+        await instance.try(() => Promise.resolve(true));
         seconds(30);
-        instance.recordSuccess();
+        await instance.try(() => Promise.resolve(true));
         seconds(30);
+        expect(instance).toHaveProperty('successes', 1);
+    });
+
+    it('remembers failures less than a minute old', async () => {
+        const instance = systemUnderTest();
+        await expect(instance.try(() => Promise.reject(true))).rejects;
+        seconds(30);
+        expect(instance).toHaveProperty('failures', 1);
+        expect(instance).toHaveProperty('successes', 0);
+        await instance.try(() => Promise.resolve(true));
+        seconds(30);
+        expect(instance).toHaveProperty('failures', 0);
         expect(instance).toHaveProperty('successes', 1);
     });
 
     it('a failure in the first tick means only one attempt in the second', async () => {
         const instance = systemUnderTest();
-        assert(instance.registerAttempt());
-        instance.recordFailure();
+        await expect(instance.try(() => Promise.reject(true))).rejects;
         seconds(1);
-        const one = instance.registerAttempt();
-        const two = instance.registerAttempt();
-        const three = instance.registerAttempt();
-        expect(one).toBeTruthy();
-        expect(two).toBeFalsy();
-        expect(three).toBeFalsy();
+        await expect(
+            instance.try(() => Promise.resolve(true)),
+        ).resolves.toBeTruthy();
+        await expect(
+            instance.try(() => Promise.resolve(true)),
+        ).rejects.toBeTruthy();
+        await expect(
+            instance.try(() => Promise.resolve(true)),
+        ).rejects.toBeTruthy();
+    });
+});
+
+describe('a sequence of successes and failures', () => {
+    const instance = systemUnderTest();
+    const source: <T>(foo: T) => Promise<T> = async <T>(foo: T) => await foo;
+    const wrapped: <T>(foo: T) => Promise<T> = instance.wrap(source);
+    const SUCCEED = Symbol('SUCCEED');
+    const FAIL = Symbol('FAIL');
+    const DECLINE = Symbol('DECLINE');
+    type Attempt = typeof SUCCEED | typeof FAIL | typeof DECLINE;
+    type Test = [number, boolean, Attempt[]];
+    const testCase: Test[] = [
+        [0, false, [SUCCEED, SUCCEED]],
+        [1, false, [SUCCEED, FAIL, SUCCEED]],
+        [2, true, [SUCCEED, SUCCEED, SUCCEED, DECLINE]],
+        [5, true, [SUCCEED, SUCCEED, SUCCEED, DECLINE]],
+        [62, false, [SUCCEED, SUCCEED, SUCCEED, SUCCEED, FAIL]],
+        [63, true, [SUCCEED, SUCCEED, SUCCEED, SUCCEED, FAIL, DECLINE]],
+        [64, true, [SUCCEED, SUCCEED, SUCCEED, SUCCEED, FAIL, DECLINE]],
+        [65, true, [SUCCEED, SUCCEED, SUCCEED, SUCCEED, FAIL, DECLINE]],
+        [66, true, [SUCCEED, SUCCEED, SUCCEED, SUCCEED, FAIL, DECLINE]],
+        [67, true, [SUCCEED, SUCCEED, SUCCEED, SUCCEED, FAIL, DECLINE]],
+        [68, true, [SUCCEED, SUCCEED, SUCCEED, SUCCEED, FAIL, DECLINE]],
+        [
+            128,
+            false,
+            [
+                SUCCEED,
+                SUCCEED,
+                SUCCEED,
+                SUCCEED,
+                FAIL,
+                SUCCEED,
+                SUCCEED,
+                SUCCEED,
+                SUCCEED,
+            ],
+        ],
+    ];
+    testCase.forEach(([timestamp, limiting, attempts]) => {
+        let j = 0;
+        attempts.forEach(attempt => {
+            ((attempt, caseInTimestamp) => {
+                it(`At second ${timestamp}, case ${caseInTimestamp}: ${attempt.toString()}`, async () => {
+                    if (caseInTimestamp === 0) {
+                        setMockTime(timestamp);
+                    }
+                    expect(instance).toHaveProperty('isLimiting', limiting);
+                    const successes = instance.successes;
+                    const failures = instance.failures;
+                    if (attempt === SUCCEED) {
+                        await expect(
+                            wrapped(Promise.resolve(timestamp)),
+                        ).resolves.toBe(timestamp);
+                        expect(instance).toHaveProperty(
+                            'successes',
+                            successes + 1,
+                        );
+                        expect(instance).toHaveProperty('failures', failures);
+                    } else if (attempt === FAIL) {
+                        await expect(
+                            wrapped(Promise.reject(timestamp)),
+                        ).rejects.toBe(timestamp);
+                        expect(instance).toHaveProperty('successes', successes);
+                        expect(instance).toHaveProperty(
+                            'failures',
+                            failures + 1,
+                        );
+                    } else if (attempt === DECLINE) {
+                        await expect(
+                            wrapped(Promise.resolve(timestamp)),
+                        ).rejects.toThrow(SelfThrottleError);
+                        expect(instance).toHaveProperty('successes', successes);
+                        expect(instance).toHaveProperty('failures', failures);
+                    }
+                });
+            })(attempt, j);
+            j++;
+        });
     });
 });

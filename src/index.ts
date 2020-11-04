@@ -45,6 +45,12 @@ class Bucket {
     }
 }
 
+export class SelfThrottleError extends Error {
+    constructor() {
+        super('Throttled by SelfThrottle');
+    }
+}
+
 /**
  * Allows clients to avoid overwhelming services with requests they can be
  * confident the service won't successfully respond to.
@@ -81,24 +87,22 @@ export class SelfThrottle {
             return;
         }
         this.lastTick += diff - (diff % 1000);
-        this.buckets.unshift(
-            new Bucket(this.lastTick, this.limitForNextTick()),
-        );
         this.buckets = this.buckets.filter(
             bucket => this.lastTick < bucket.expiry,
         );
+        this.buckets.unshift(
+            new Bucket(this.lastTick, this.limitForNextTick()),
+        );
     }
 
-    recordSuccess() {
+    get isLimiting(): boolean {
         this.maybeTick();
-        this.buckets[0].successes += 1;
+        return this.buckets[0].limiting;
     }
 
-    recordFailure() {
-        this.maybeTick();
-        this.buckets[0].failures += 1;
-    }
-
+    /**
+     * The number of requests made in the last minute that have successfully returned.
+     */
     get successes(): number {
         this.maybeTick();
         return this._successes();
@@ -108,6 +112,9 @@ export class SelfThrottle {
         return this.buckets.reduce((prev, cur) => prev + cur.successes, 0);
     }
 
+    /**
+     * The number of requests made in the last minute that have returned with an error.
+     */
     get failures(): number {
         this.maybeTick();
         return this._failures();
@@ -117,30 +124,36 @@ export class SelfThrottle {
         return this.buckets.reduce((prev, cur) => prev + cur.failures, 0);
     }
 
-    registerAttempt() {
-        this.maybeTick();
-        return this.buckets[0].try();
+    /**
+     * If we're not limiting or have not reached our limit, executes the function and returns the promise it returns.
+     * @param f A promise generator
+     */
+    try<T>(f: () => Promise<T>): Promise<T> {
+        return this.wrap(f)();
     }
 
-    attempt(callback: (success: () => void, failure: () => void) => void) {
-        this.maybeTick();
-        const bucket = this.buckets[0];
-        bucket.attempts++;
-        callback(
-            () => {
-                bucket.successes++;
-            },
-            () => {
-                bucket.failures++;
-            },
-        );
-    }
-
-    async registerPromise<T>(promise: Promise<T>): Promise<T> {
-        this.maybeTick();
-        const bucket = this.buckets[0];
-        const result = await promise;
-        bucket.successes++;
-        return result;
+    /**
+     * Wraps the provided function so it will be throttled if it fails.
+     * @param f The function to be wrapped
+     */
+    wrap<F extends (...args: P) => Promise<T>, T, P extends any[]>(f: F): F {
+        return ((...p: P): Promise<T> => {
+            this.maybeTick();
+            const bucket = this.buckets[0];
+            if (bucket.try()) {
+                try {
+                    const promise = f(...p);
+                    Promise.resolve(promise).then(
+                        () => bucket.successes++,
+                        () => bucket.failures++,
+                    );
+                    return promise;
+                } catch (e) {
+                    bucket.failures++;
+                    throw e;
+                }
+            }
+            return Promise.reject(new SelfThrottleError());
+        }) as F;
     }
 }
