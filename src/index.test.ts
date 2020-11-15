@@ -57,6 +57,12 @@ const buildPromise = <T>(): [
 };
 
 describe('Can initialise', () => {
+    it('test matchers', async () => {
+        const asyncThrow = async () => {
+            return Promise.reject(new Error('foo'));
+        };
+        await expect(asyncThrow()).rejects.toThrow('foo');
+    });
     it('is constructable', () => {
         const instance = new SelfThrottle();
         expect(instance).toBeInstanceOf(SelfThrottle);
@@ -68,20 +74,20 @@ const systemUnderTest = () => new SelfThrottle();
 describe('Basic event submission', () => {
     it('will count successes', async () => {
         const instance = systemUnderTest();
-        await instance.try(async () => true);
+        await instance.attempt(async () => true);
         expect(instance).toHaveProperty('successes', 1);
     });
 
     it('will allow an attempt', async () => {
         const instance = systemUnderTest();
-        const result = await instance.try(async () => true);
+        const result = await instance.attempt(async () => true);
         expect(result).toBeTruthy();
     });
 
     it('will allow more than one request in the first second', async () => {
         const instance = systemUnderTest();
-        const one = await instance.try(async () => true);
-        const two = await instance.try(async () => true);
+        const one = await instance.attempt(async () => true);
+        const two = await instance.attempt(async () => true);
         expect(one).toBeTruthy();
         expect(two).toBeTruthy();
     });
@@ -140,27 +146,27 @@ describe('Failures', () => {
 describe('Time', () => {
     it('forgets successes after a minute', () => {
         const instance = systemUnderTest();
-        instance.try(() => Promise.resolve(true));
+        instance.attempt(() => Promise.resolve(true));
         seconds(60);
         expect(instance).toHaveProperty('successes', 0);
     });
 
     it('remembers successes less than a minute old', async () => {
         const instance = systemUnderTest();
-        await instance.try(() => Promise.resolve(true));
+        await instance.attempt(() => Promise.resolve(true));
         seconds(30);
-        await instance.try(() => Promise.resolve(true));
+        await instance.attempt(() => Promise.resolve(true));
         seconds(30);
         expect(instance).toHaveProperty('successes', 1);
     });
 
     it('remembers failures less than a minute old', async () => {
         const instance = systemUnderTest();
-        await expect(instance.try(() => Promise.reject(true))).rejects;
+        await expect(instance.attempt(() => Promise.reject(true))).rejects;
         seconds(30);
         expect(instance).toHaveProperty('failures', 1);
         expect(instance).toHaveProperty('successes', 0);
-        await instance.try(() => Promise.resolve(true));
+        await instance.attempt(() => Promise.resolve(true));
         seconds(30);
         expect(instance).toHaveProperty('failures', 0);
         expect(instance).toHaveProperty('successes', 1);
@@ -168,16 +174,16 @@ describe('Time', () => {
 
     it('a failure in the first tick means only one attempt in the second', async () => {
         const instance = systemUnderTest();
-        await expect(instance.try(() => Promise.reject(true))).rejects;
+        await expect(instance.attempt(() => Promise.reject(true))).rejects;
         seconds(1);
         await expect(
-            instance.try(() => Promise.resolve(true)),
+            instance.attempt(() => Promise.resolve(true)),
         ).resolves.toBeTruthy();
         await expect(
-            instance.try(() => Promise.resolve(true)),
+            instance.attempt(() => Promise.resolve(true)),
         ).rejects.toBeTruthy();
         await expect(
-            instance.try(() => Promise.resolve(true)),
+            instance.attempt(() => Promise.resolve(true)),
         ).rejects.toBeTruthy();
     });
 });
