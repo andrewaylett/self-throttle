@@ -16,6 +16,7 @@
  */
 
 import { millisecondTicker } from './time';
+import { Limit, Limited, isLimited, Unlimited } from './limits';
 
 /**
  * A record of what happened during a single tick.
@@ -26,22 +27,17 @@ class Bucket {
     successes: number = 0;
     failures: number = 0;
     attempts: number = 0;
-    limit: number;
-    limiting: boolean;
+    limit: Limit;
 
-    constructor(tick: number, limit: [number, boolean]) {
+    constructor(tick: number, limit: Limit) {
         this.tick = tick;
         this.expiry = tick + 60_000;
-        this.limit = limit[0];
-        this.limiting = limit[1];
+        this.limit = limit;
     }
 
-    try() {
-        if (!this.limiting || this.attempts < this.limit) {
-            this.attempts++;
-            return true;
-        }
-        return false;
+    attempt() {
+        this.attempts++;
+        return !isLimited(this.limit) || this.attempts <= this.limit.limit;
     }
 }
 
@@ -69,14 +65,16 @@ export class SelfThrottle {
         this.buckets = [];
     }
 
-    private limitForNextTick(): [number, boolean] {
-        if (this._failures() == 0) {
-            return [-1, false];
+    private limitForNextTick(): Limit {
+        if (this._failures() === 0) {
+            return Unlimited;
         }
-        const computedLimit = Math.ceil(
+        const maybeLimit = Math.ceil(
             (1.2 * this._successes()) / this.buckets.length,
         );
-        return [Math.max(1, isNaN(computedLimit) ? 1 : computedLimit), true];
+        const limit = Math.max(1, isNaN(maybeLimit) ? 1 : maybeLimit);
+        const rate = this._successes() / this._attempts();
+        return Limited({ limit, rate });
     }
 
     private maybeTick() {
@@ -97,7 +95,7 @@ export class SelfThrottle {
 
     get isLimiting(): boolean {
         this.maybeTick();
-        return this.buckets[0].limiting;
+        return isLimited(this.buckets[0].limit);
     }
 
     /**
@@ -110,6 +108,10 @@ export class SelfThrottle {
 
     private _successes() {
         return this.buckets.reduce((prev, cur) => prev + cur.successes, 0);
+    }
+
+    private _attempts() {
+        return this.buckets.reduce((prev, cur) => prev + cur.attempts, 0);
     }
 
     /**
@@ -128,7 +130,7 @@ export class SelfThrottle {
      * If we're not limiting or have not reached our limit, executes the function and returns the promise it returns.
      * @param f A promise generator
      */
-    try<T>(f: () => Promise<T>): Promise<T> {
+    attempt<T>(f: () => Promise<T>): Promise<T> {
         return this.wrap(f)();
     }
 
@@ -140,7 +142,7 @@ export class SelfThrottle {
         return ((...p: P): Promise<T> => {
             this.maybeTick();
             const bucket = this.buckets[0];
-            if (bucket.try()) {
+            if (bucket.attempt()) {
                 try {
                     const promise = f(...p);
                     Promise.resolve(promise).then(
