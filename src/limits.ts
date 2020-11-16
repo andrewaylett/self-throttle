@@ -15,30 +15,23 @@
  *
  */
 
-enum Limits {
-    Limited,
-    Unlimited,
+class Unlimited {
+    readonly isLimited: false = false;
 }
-
-type Unlimited = {
-    readonly _tag: Limits.Unlimited;
-};
-type Limited = {
-    readonly _tag: Limits.Limited;
+class Limited {
+    constructor(limit: number, rate: number) {
+        this.limit = limit;
+        this.rate = rate;
+    }
+    readonly isLimited: true = true;
     readonly limit: number;
     readonly rate: number;
-};
+}
 
 export type Limit = Unlimited | Limited;
-
-export const Unlimited: Limit = { _tag: Limits.Unlimited };
-export const Limited: (input: { limit: number; rate: number }) => Limit = ({
-    limit,
-    rate,
-}) => ({
-    _tag: Limits.Limited,
-    limit,
-    rate,
-});
-
-export const isLimited = (x: Limit): x is Limited => x._tag === Limits.Limited;
+// eslint-disable-next-line no-redeclare
+export const Limit = {
+    unlimited: new Unlimited(),
+    limited: ({ limit, rate }: { limit: number; rate: number }) =>
+        new Limited(limit, rate),
+};

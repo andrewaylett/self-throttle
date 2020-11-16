@@ -16,7 +16,7 @@
  */
 
 import { millisecondTicker } from './time';
-import { Limit, Limited, isLimited, Unlimited } from './limits';
+import { Limit } from './limits';
 
 /**
  * A record of what happened during a single tick.
@@ -37,7 +37,7 @@ class Bucket {
 
     attempt() {
         this.attempts++;
-        return !isLimited(this.limit) || this.attempts <= this.limit.limit;
+        return !this.limit.isLimited || this.attempts <= this.limit.limit;
     }
 }
 
@@ -67,14 +67,14 @@ export class SelfThrottle {
 
     private limitForNextTick(): Limit {
         if (this._failures() === 0) {
-            return Unlimited;
+            return Limit.unlimited;
         }
         const maybeLimit = Math.ceil(
             (1.2 * this._successes()) / this.buckets.length,
         );
         const limit = Math.max(1, isNaN(maybeLimit) ? 1 : maybeLimit);
         const rate = this._successes() / this._attempts();
-        return Limited({ limit, rate });
+        return Limit.limited({ limit, rate });
     }
 
     private maybeTick() {
@@ -95,7 +95,7 @@ export class SelfThrottle {
 
     get isLimiting(): boolean {
         this.maybeTick();
-        return isLimited(this.buckets[0].limit);
+        return this.buckets[0].limit.isLimited;
     }
 
     /**
