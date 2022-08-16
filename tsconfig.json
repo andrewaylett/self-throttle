@@ -1,7 +1,7 @@
 {
   // see https://www.typescriptlang.org/tsconfig to better understand tsconfigs
   "include": ["src", "types"],
-  "extends":"@tsconfig/node12/tsconfig.json",
+  "extends":"@tsconfig/node16/tsconfig.json",
   "compilerOptions": {
     "module": "ESNext",
     "importHelpers": true,

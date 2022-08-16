@@ -5,3 +5,6 @@ dist
 .idea
 .~
 .*.swp
+.parcel-cache
+.tool-versions
+.npmrc

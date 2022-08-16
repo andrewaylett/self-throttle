@@ -42,10 +42,10 @@ const setMockTime = (s: number) => {
 
 const buildPromise = <T>(): [
     Promise<T>,
-    (v: T | PromiseLike<T> | undefined) => void,
+    (v: T | PromiseLike<T>) => void,
     (reason?: any) => void,
 ] => {
-    let resolve: (v: T | PromiseLike<T> | undefined) => void;
+    let resolve: (v: T | PromiseLike<T>) => void;
     let reject: (reason?: any) => void;
     const promise = new Promise<T>((resolve1, reject1) => {
         resolve = resolve1;
