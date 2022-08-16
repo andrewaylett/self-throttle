@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -25,8 +25,7 @@
     "pretest": "npm run lint",
     "prelint": "npm run check",
     "lint:fix": "npm run lint -- --fix",
-    "size": "size-limit",
-    "analyze": "size-limit --why"
+    "prepublishOnly": "npm run build"
   },
   "prettier": {
     "semi": true,
