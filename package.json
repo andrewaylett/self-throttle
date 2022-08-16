@@ -5,29 +5,29 @@
     "type": "git",
     "url": "https://github.com/andrewaylett/self-throttle.git"
   },
-  "main": "dist/index.js",
-  "esnext": "dist/self-throttle.esm.js",
-  "typings": "dist/index.d.ts",
+  "source": "src/index.ts",
+  "main": "dist/main.js",
+  "module": "dist/module.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist",
     "src"
   ],
   "engines": {
-    "node": ">=12"
+    "node": ">=16"
   },
   "scripts": {
-    "start": "tsdx watch",
-    "build": "tsdx build",
+    "build": "parcel build src/index.ts",
+    "test": "jest",
+    "lint": "eslint",
+    "check": "tsc --noEmit",
     "prebuild": "npm run test",
-    "test": "tsdx test",
     "pretest": "npm run lint",
-    "lint": "tsdx lint src",
+    "prelint": "npm run check",
     "lint:fix": "npm run lint -- --fix",
-    "prepare": "tsdx build",
     "size": "size-limit",
     "analyze": "size-limit --why"
   },
-  "peerDependencies": {},
   "husky": {
     "hooks": {
       "pre-commit": "npm test"
@@ -40,7 +40,6 @@
   },
   "name": "self-throttle",
   "author": "Andrew Aylett",
-  "module": "dist/self-throttle.esm.js",
   "size-limit": [
     {
       "path": "dist/self-throttle.cjs.production.min.js",
@@ -52,33 +51,20 @@
     }
   ],
   "devDependencies": {
+    "@parcel/packager-ts": "^2.7.0",
+    "@parcel/transformer-typescript-types": "^2.7.0",
     "@size-limit/preset-small-lib": "4.9.2",
     "@tsconfig/node12": "1.0.7",
     "@types/jest": "26.0.15",
-    "@types/node": "12.19.5",
+    "@types/node": "16.11.49",
     "@typescript-eslint/eslint-plugin": "4.8.1",
     "@typescript-eslint/parser": "4.8.1",
     "eslint": "7.13.0",
-    "eslint-plugin-react-hooks": "4.2.0",
     "husky": "4.3.7",
     "jest": "26.6.3",
-    "size-limit": "4.8.0",
+    "parcel": "^2.7.0",
     "ts-jest": "26.4.4",
-    "tsdx": "0.14.1",
     "tslib": "2.0.3",
     "typescript": "4.0.5"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version",
-      "node >= 12"
-    ]
   }
 }
