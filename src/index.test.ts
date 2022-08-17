@@ -43,16 +43,18 @@ const setMockTime = (s: number) => {
 const buildPromise = <T>(): [
     Promise<T>,
     (v: T | PromiseLike<T>) => void,
-    (reason?: any) => void,
+    (reason?: unknown) => void,
 ] => {
     let resolve: (v: T | PromiseLike<T>) => void;
-    let reject: (reason?: any) => void;
+    let reject: (reason?: unknown) => void;
     const promise = new Promise<T>((resolve1, reject1) => {
         resolve = resolve1;
         reject = reject1;
     });
-    // @ts-ignore
-    // noinspection JSUnusedAssignment
+    // This is safe because the executor for the promise runs synchronously.
+    // But the TS compiler doesn't know that.
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore TS2454
     return [promise, resolve, reject];
 };
 
@@ -97,7 +99,7 @@ describe('Promise Submission', () => {
     it('will count a wrap returning a successful promise', async () => {
         const instance = systemUnderTest();
         const promise = Promise.resolve(true);
-        const wrapped = instance.wrap(async b => b);
+        const wrapped = instance.wrap(async (b) => b);
         const result = await wrapped(promise);
         expect(await promise).toBeTruthy();
         expect(result).toBeTruthy();
@@ -107,7 +109,7 @@ describe('Promise Submission', () => {
     it('counts promises against the tick they started in', async () => {
         const [promise, resolve] = buildPromise<boolean>();
         const instance = systemUnderTest();
-        const wrapped = instance.wrap(async b => b);
+        const wrapped = instance.wrap(async (b) => b);
         const returnedPromise = wrapped(promise);
         expect(instance).toHaveProperty('successes', 0);
         seconds(30);
@@ -190,8 +192,8 @@ describe('Time', () => {
 
 describe('a sequence of successes and failures', () => {
     const instance = systemUnderTest();
-    const source: <T>(foo: T) => Promise<T> = async <T>(foo: T) => await foo;
-    const wrapped: <T>(foo: T) => Promise<T> = instance.wrap(source);
+    const source = async <T>(arg: T) => await arg;
+    const wrapped = instance.wrap(source);
     const SUCCEED = Symbol('SUCCEED');
     const FAIL = Symbol('FAIL');
     const DECLINE = Symbol('DECLINE');
@@ -227,7 +229,7 @@ describe('a sequence of successes and failures', () => {
     ];
     testCase.forEach(([timestamp, limiting, attempts]) => {
         let j = 0;
-        attempts.forEach(attempt => {
+        attempts.forEach((attempt) => {
             ((attempt, caseInTimestamp) => {
                 it(`At second ${timestamp}, case ${caseInTimestamp}: ${attempt.toString()}`, async () => {
                     if (caseInTimestamp === 0) {

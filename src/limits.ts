@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Andrew Aylett
+ * Copyright 2020-2022 Andrew Aylett
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,14 @@
  */
 
 class Unlimited {
-    readonly isLimited: false = false;
+    readonly isLimited = false as const;
 }
 class Limited {
     constructor(limit: number, rate: number) {
         this.limit = limit;
         this.rate = rate;
     }
-    readonly isLimited: true = true;
+    readonly isLimited = true as const;
     readonly limit: number;
     readonly rate: number;
 }

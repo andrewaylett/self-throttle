@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Andrew Aylett
+ * Copyright 2020-2022 Andrew Aylett
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,9 @@ import { Limit } from './limits';
 class Bucket {
     readonly tick: number;
     readonly expiry: number;
-    successes: number = 0;
-    failures: number = 0;
-    attempts: number = 0;
+    successes = 0;
+    failures = 0;
+    attempts = 0;
     readonly limit: Limit;
 
     constructor(tick: number, limit: Limit) {
@@ -59,25 +59,25 @@ export class SelfThrottleError extends Error {
  */
 export class SelfThrottle {
     #buckets: Bucket[];
-    #lastTick: number = 0;
+    #lastTick = 0;
 
     constructor() {
         this.#buckets = [];
     }
 
-    private limitForNextTick(): Limit {
-        if (this._failures() === 0) {
+    #limitForNextTick(): Limit {
+        if (this.#failures() === 0) {
             return Limit.unlimited;
         }
         const maybeLimit = Math.ceil(
-            (1.2 * this._successes()) / this.#buckets.length,
+            (1.2 * this.#successes()) / this.#buckets.length,
         );
         const limit = Math.max(1, isNaN(maybeLimit) ? 1 : maybeLimit);
-        const rate = this._successes() / this._attempts();
+        const rate = this.#successes() / this.#attempts();
         return Limit.limited({ limit, rate });
     }
 
-    private maybeTick() {
+    #maybeTick() {
         const now = millisecondTicker();
         const diff = now - this.#lastTick;
         if (diff < 1000 && this.#buckets.length > 0) {
@@ -86,15 +86,18 @@ export class SelfThrottle {
         }
         this.#lastTick += diff - (diff % 1000);
         this.#buckets = this.#buckets.filter(
-            bucket => this.#lastTick < bucket.expiry,
+            (bucket) => this.#lastTick < bucket.expiry,
         );
         this.#buckets.unshift(
-            new Bucket(this.#lastTick, this.limitForNextTick()),
+            new Bucket(this.#lastTick, this.#limitForNextTick()),
         );
     }
 
+    /**
+     * Whether we will even consider denying an attempt.
+     */
     get isLimiting(): boolean {
-        this.maybeTick();
+        this.#maybeTick();
         return this.#buckets[0].limit.isLimited;
     }
 
@@ -102,15 +105,15 @@ export class SelfThrottle {
      * The number of requests made in the last minute that have successfully returned.
      */
     get successes(): number {
-        this.maybeTick();
-        return this._successes();
+        this.#maybeTick();
+        return this.#successes();
     }
 
-    private _successes() {
+    #successes() {
         return this.#buckets.reduce((prev, cur) => prev + cur.successes, 0);
     }
 
-    private _attempts() {
+    #attempts() {
         return this.#buckets.reduce((prev, cur) => prev + cur.attempts, 0);
     }
 
@@ -118,11 +121,11 @@ export class SelfThrottle {
      * The number of requests made in the last minute that have returned with an error.
      */
     get failures(): number {
-        this.maybeTick();
-        return this._failures();
+        this.#maybeTick();
+        return this.#failures();
     }
 
-    private _failures() {
+    #failures() {
         return this.#buckets.reduce((prev, cur) => prev + cur.failures, 0);
     }
 
@@ -135,12 +138,14 @@ export class SelfThrottle {
     }
 
     /**
-     * Wraps the provided function so it will be throttled if it fails.
+     * Wraps the provided function, so it will be throttled if it fails.
      * @param f The function to be wrapped
      */
-    wrap<T, P extends any[]>(f: (...p: P) => T|PromiseLike<T>): (...p: P) => Promise<T> {
-        return ((...p: P): Promise<T> => {
-            this.maybeTick();
+    wrap<T, P extends unknown[]>(
+        f: (...p: P) => T | PromiseLike<T>,
+    ): (...p: P) => Promise<T> {
+        return (...p: P): Promise<T> => {
+            this.#maybeTick();
             const bucket = this.#buckets[0];
             if (bucket.attempt()) {
                 try {
@@ -156,6 +161,6 @@ export class SelfThrottle {
                 }
             }
             return Promise.reject<T>(new SelfThrottleError());
-        });
+        };
     }
 }
