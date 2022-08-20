@@ -1,5 +1,6 @@
 {
   "name": "self-throttle",
+  "description": "Helps clients to not overwhelm the services they call",
   "author": "Andrew Aylett",
   "version": "0.3.1",
   "license": "Apache-2.0",
