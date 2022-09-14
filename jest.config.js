@@ -1,4 +1,5 @@
+// noinspection JSUnusedGlobalSymbols
 export default {
-    preset: 'ts-jest',
     testEnvironment: 'node',
+    injectGlobals: false,
 };

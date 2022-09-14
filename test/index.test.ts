@@ -15,20 +15,18 @@
  *
  */
 
-import 'jest';
-import { SelfThrottle, SelfThrottleError } from './index';
-import { millisecondTicker } from './time';
+import { describe, it, jest } from '@jest/globals';
+import { SelfThrottle } from 'self-throttle';
 
-jest.mock('./time');
-const mockMillisecondTicker = millisecondTicker as jest.Mock<
-    ReturnType<typeof millisecondTicker>
->;
+import { Attempt, DECLINE, FAIL, SUCCEED, expect } from './expect.js';
+
+const mockNow = jest.fn<() => number>();
 
 type ms = 'ms';
-const ms = 'ms'; // eslint-disable-line no-redeclare
+const ms = 'ms';
 type MilliSeconds = [number, ms];
 let nextMockTime: MilliSeconds = [0, ms];
-mockMillisecondTicker.mockImplementation(() => {
+mockNow.mockImplementation(() => {
     const result = nextMockTime[0];
     nextMockTime[0] += 1;
     return result;
@@ -61,28 +59,33 @@ const buildPromise = <T>(): [
 describe('Can initialise', () => {
     it('test matchers', async () => {
         const asyncThrow = async () => {
-            return Promise.reject(new Error('foo'));
+            throw new Error('foo');
         };
+
         await expect(asyncThrow()).rejects.toThrow('foo');
     });
+
     it('is constructable', () => {
         const instance = new SelfThrottle();
+
         expect(instance).toBeInstanceOf(SelfThrottle);
     });
 });
 
-const systemUnderTest = () => new SelfThrottle();
+const systemUnderTest = () => new SelfThrottle(mockNow);
 
 describe('Basic event submission', () => {
     it('will count successes', async () => {
         const instance = systemUnderTest();
         await instance.attempt(async () => true);
+
         expect(instance).toHaveProperty('successes', 1);
     });
 
     it('will allow an attempt', async () => {
         const instance = systemUnderTest();
         const result = await instance.attempt(async () => true);
+
         expect(result).toBeTruthy();
     });
 
@@ -90,6 +93,7 @@ describe('Basic event submission', () => {
         const instance = systemUnderTest();
         const one = await instance.attempt(async () => true);
         const two = await instance.attempt(async () => true);
+
         expect(one).toBeTruthy();
         expect(two).toBeTruthy();
     });
@@ -101,6 +105,7 @@ describe('Promise Submission', () => {
         const promise = Promise.resolve(true);
         const wrapped = instance.wrap(async (b) => b);
         const result = await wrapped(promise);
+
         expect(await promise).toBeTruthy();
         expect(result).toBeTruthy();
         expect(instance).toHaveProperty('successes', 1);
@@ -111,12 +116,17 @@ describe('Promise Submission', () => {
         const instance = systemUnderTest();
         const wrapped = instance.wrap(async (b) => b);
         const returnedPromise = wrapped(promise);
+
         expect(instance).toHaveProperty('successes', 0);
+
         seconds(30);
         resolve(true);
+
         expect(await returnedPromise).toBeTruthy();
         expect(instance).toHaveProperty('successes', 1);
+
         seconds(30);
+
         expect(instance).toHaveProperty('successes', 0);
     });
 });
@@ -128,6 +138,7 @@ describe('Failures', () => {
         const wrapped = instance.wrap(() => {
             throw error;
         });
+
         expect(wrapped).toThrow(error);
         expect(instance).toHaveProperty('successes', 0);
         expect(instance).toHaveProperty('failures', 1);
@@ -139,6 +150,7 @@ describe('Failures', () => {
         const wrapped = instance.wrap(async () => {
             throw error;
         });
+
         await expect(wrapped()).rejects.toThrow(error);
         expect(instance).toHaveProperty('successes', 0);
         expect(instance).toHaveProperty('failures', 1);
@@ -150,6 +162,7 @@ describe('Time', () => {
         const instance = systemUnderTest();
         instance.attempt(() => Promise.resolve(true));
         seconds(60);
+
         expect(instance).toHaveProperty('successes', 0);
     });
 
@@ -159,25 +172,38 @@ describe('Time', () => {
         seconds(30);
         await instance.attempt(() => Promise.resolve(true));
         seconds(30);
+
         expect(instance).toHaveProperty('successes', 1);
     });
 
     it('remembers failures less than a minute old', async () => {
         const instance = systemUnderTest();
-        await expect(instance.attempt(() => Promise.reject(true))).rejects;
+
+        await expect(
+            instance.attempt(() => Promise.reject(true)),
+        ).rejects.toBeTruthy();
+
         seconds(30);
+
         expect(instance).toHaveProperty('failures', 1);
         expect(instance).toHaveProperty('successes', 0);
+
         await instance.attempt(() => Promise.resolve(true));
         seconds(30);
+
         expect(instance).toHaveProperty('failures', 0);
         expect(instance).toHaveProperty('successes', 1);
     });
 
     it('a failure in the first tick means only one attempt in the second', async () => {
         const instance = systemUnderTest();
-        await expect(instance.attempt(() => Promise.reject(true))).rejects;
+
+        await expect(
+            instance.attempt(() => Promise.reject(true)),
+        ).rejects.toBeTruthy();
+
         seconds(1);
+
         await expect(
             instance.attempt(() => Promise.resolve(true)),
         ).resolves.toBeTruthy();
@@ -192,12 +218,6 @@ describe('Time', () => {
 
 describe('a sequence of successes and failures', () => {
     const instance = systemUnderTest();
-    const source = async <T>(arg: T) => await arg;
-    const wrapped = instance.wrap(source);
-    const SUCCEED = Symbol('SUCCEED');
-    const FAIL = Symbol('FAIL');
-    const DECLINE = Symbol('DECLINE');
-    type Attempt = typeof SUCCEED | typeof FAIL | typeof DECLINE;
     type Test = [number, boolean, Attempt[]];
     const testCase: Test[] = [
         [0, false, [SUCCEED, SUCCEED]],
@@ -227,45 +247,29 @@ describe('a sequence of successes and failures', () => {
             ],
         ],
     ];
-    testCase.forEach(([timestamp, limiting, attempts]) => {
+    for (const [timestamp, limiting, attempts] of testCase) {
         let j = 0;
-        attempts.forEach((attempt) => {
+        for (const attempt of attempts) {
             ((attempt, caseInTimestamp) => {
                 it(`At second ${timestamp}, case ${caseInTimestamp}: ${attempt.toString()}`, async () => {
                     if (caseInTimestamp === 0) {
                         setMockTime(timestamp);
                     }
+
                     expect(instance).toHaveProperty('isLimiting', limiting);
+
                     const successes = instance.successes;
                     const failures = instance.failures;
-                    if (attempt === SUCCEED) {
-                        await expect(
-                            wrapped(Promise.resolve(timestamp)),
-                        ).resolves.toBe(timestamp);
-                        expect(instance).toHaveProperty(
-                            'successes',
-                            successes + 1,
-                        );
-                        expect(instance).toHaveProperty('failures', failures);
-                    } else if (attempt === FAIL) {
-                        await expect(
-                            wrapped(Promise.reject(timestamp)),
-                        ).rejects.toBe(timestamp);
-                        expect(instance).toHaveProperty('successes', successes);
-                        expect(instance).toHaveProperty(
-                            'failures',
-                            failures + 1,
-                        );
-                    } else if (attempt === DECLINE) {
-                        await expect(
-                            wrapped(Promise.resolve(timestamp)),
-                        ).rejects.toThrow(SelfThrottleError);
-                        expect(instance).toHaveProperty('successes', successes);
-                        expect(instance).toHaveProperty('failures', failures);
-                    }
+
+                    await expect(instance).throttlesTo(
+                        timestamp,
+                        attempt,
+                        successes,
+                        failures,
+                    );
                 });
             })(attempt, j);
             j++;
-        });
-    });
+        }
+    }
 });

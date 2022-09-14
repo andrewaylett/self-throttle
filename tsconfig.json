@@ -1,15 +1,19 @@
 {
-  // see https://www.typescriptlang.org/tsconfig to better understand tsconfigs
-  "include": ["src", "types"],
-  "exclude": ["**/*.test.ts"],
   "extends":"@tsconfig/node16/tsconfig.json",
+  "references": [{
+    "path": "./src"
+  },
+    {
+      "path": "./test"
+    }
+  ],
+  "files": [],
   "compilerOptions": {
-    "module": "ESNext",
-    "target": "ESNext",
+    "module": "Node16",
+    "target": "ES2022",
     "declaration": true,
     "sourceMap": true,
-    "rootDir": "./src",
-    "outDir": "./dist",
+    "declarationMap": true,
     // linter checks for common issues
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
@@ -17,6 +21,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     // use Node's module resolution algorithm, instead of the legacy TS one
-    "moduleResolution": "node"
+    "moduleResolution": "Node16",
+    "composite": true,
+    "tsBuildInfoFile": "./build/base.tsBuildInfo"
   }
 }

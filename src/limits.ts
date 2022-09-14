@@ -29,7 +29,6 @@ class Limited {
 }
 
 export type Limit = Unlimited | Limited;
-// eslint-disable-next-line no-redeclare
 export const Limit = {
     unlimited: new Unlimited(),
     limited: ({ limit, rate }: { limit: number; rate: number }) =>

@@ -1,17 +1,8 @@
 {
   "root": true,
-  "parser": "@typescript-eslint/parser",
-  "plugins": [
-    "@typescript-eslint",
-    "prettier"
-  ],
-  "extends": [
-    "eslint:recommended",
-    "plugin:@typescript-eslint/eslint-recommended",
-    "plugin:@typescript-eslint/recommended",
-    "prettier"
-  ],
-  "rules": {
-    "prettier/prettier": 2
-  }
+    "extends": ["andrewaylett", "plugin:unicorn/recommended"],
+    "rules": {
+        "unicorn/prevent-abbreviations": 0,
+        "unicorn/consistent-function-scoping": 0
+    }
 }
