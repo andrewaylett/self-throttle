@@ -1,8 +1,9 @@
 *.log
 .DS_Store
-node_modules
-dist
-.idea
+/node_modules/
+/dist/
+/build/
+/.idea/
 .~
 .*.swp
 .parcel-cache

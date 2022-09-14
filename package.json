@@ -9,20 +9,26 @@
     "url": "https://github.com/andrewaylett/self-throttle.git"
   },
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "files": [
     "dist",
     "src"
   ],
   "scripts": {
-    "build": "tsc",
-    "test": "jest",
-    "lint": "eslint src --ext .ts",
+    "build": "npm run buildonly",
+    "buildonly": "tsc --build .",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest build",
+    "lint": "eslint .",
     "prebuild": "npm run test",
-    "pretest": "npm run lint",
+    "pretest": "npm run lint && npm run buildonly",
     "lint:fix": "npm run lint -- --fix",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "dev": "npm run lint:fix && npm run build"
   },
   "prettier": {
     "semi": true,
@@ -36,12 +42,11 @@
     "@typescript-eslint/eslint-plugin": "5.37.0",
     "@typescript-eslint/parser": "5.37.0",
     "eslint": "8.23.1",
-    "eslint-config-prettier": "8.5.0",
-    "eslint-plugin-prettier": "4.2.1",
+    "eslint-config-andrewaylett": "1.0.0",
+    "eslint-plugin-unicorn": "43.0.2",
+    "extend-expect": "1.0.2",
     "jest": "29.0.3",
     "prettier": "2.7.1",
-    "ts-jest": "29.0.1",
-    "tslib": "2.4.0",
     "typescript": "4.8.3"
   }
 }

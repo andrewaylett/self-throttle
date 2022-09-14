@@ -15,8 +15,7 @@
  *
  */
 
-import { millisecondTicker } from './time';
-import { Limit } from './limits';
+import { Limit } from './limits.js';
 
 /**
  * A record of what happened during a single tick.
@@ -60,9 +59,11 @@ export class SelfThrottleError extends Error {
 export class SelfThrottle {
     #buckets: Bucket[];
     #lastTick = 0;
+    #now: () => number;
 
-    constructor() {
+    constructor(now: () => number = Date.now) {
         this.#buckets = [];
+        this.#now = now;
     }
 
     #limitForNextTick(): Limit {
@@ -72,13 +73,13 @@ export class SelfThrottle {
         const maybeLimit = Math.ceil(
             (1.2 * this.#successes()) / this.#buckets.length,
         );
-        const limit = Math.max(1, isNaN(maybeLimit) ? 1 : maybeLimit);
+        const limit = Math.max(1, Number.isNaN(maybeLimit) ? 1 : maybeLimit);
         const rate = this.#successes() / this.#attempts();
         return Limit.limited({ limit, rate });
     }
 
     #maybeTick() {
-        const now = millisecondTicker();
+        const now = this.#now();
         const diff = now - this.#lastTick;
         if (diff < 1000 && this.#buckets.length > 0) {
             // No need to tick, we're still in the same second
@@ -155,9 +156,9 @@ export class SelfThrottle {
                         () => bucket.failures++,
                     );
                     return promise;
-                } catch (e) {
+                } catch (error) {
                     bucket.failures++;
-                    throw e;
+                    throw error;
                 }
             }
             return Promise.reject<T>(new SelfThrottleError());

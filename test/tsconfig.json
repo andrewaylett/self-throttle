@@ -1,0 +1,12 @@
+{
+  "extends": "..",
+  "include": ["./**/*.ts"],
+  "references": [{
+    "path": "../src"
+  }
+  ],
+  "compilerOptions": {
+    "outDir": "../build/test/",
+    "tsBuildInfoFile": "../build/test.tsBuildInfo"
+  }
+}
