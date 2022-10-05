@@ -43,7 +43,7 @@
     "@typescript-eslint/parser": "5.39.0",
     "eslint": "8.24.0",
     "eslint-config-andrewaylett": "2.1.1",
-    "eslint-plugin-unicorn": "43.0.2",
+    "eslint-plugin-unicorn": "44.0.1",
     "extend-expect": "1.0.2",
     "jest": "29.1.2",
     "prettier": "2.7.1",
