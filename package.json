@@ -42,7 +42,7 @@
     "@typescript-eslint/eslint-plugin": "5.59.9",
     "@typescript-eslint/parser": "5.59.9",
     "eslint": "8.42.0",
-    "eslint-config-andrewaylett": "2.2.0",
+    "eslint-config-andrewaylett": "2.3.0",
     "eslint-plugin-unicorn": "46.0.1",
     "extend-expect": "1.0.2",
     "jest": "29.5.0",
